@@ -1,0 +1,67 @@
+# pipeline.yml
+
+stages:
+  - name: Deploy EKS Cluster
+    steps:
+      - name: Checkout repository
+        image: alpine/git
+        commands:
+          - git clone <repository_url>
+          - cd <repository_directory>
+
+      - name: Install Terraform
+        image: hashicorp/terraform:1.0.0
+        commands:
+          - terraform init
+          - terraform plan
+          - terraform apply -auto-approve
+
+  - name: Deploy Aurora PostgreSQL
+    steps:
+      - name: Configure AWS credentials
+        image: amazon/aws-cli
+        commands:
+          - aws configure set aws_access_key_id <access_key>
+          - aws configure set aws_secret_access_key <secret_key>
+          - aws configure set default.region <region>
+
+      - name: Deploy Aurora PostgreSQL
+        image: amazon/aws-cli
+        commands:
+          - aws rds create-db-cluster \
+            --db-cluster-identifier my-aurora-cluster \
+            --engine aurora-postgresql \
+            --engine-version 10.16 \
+            --master-username admin \
+            --master-user-password password \
+            --database-name my-database \
+            --vpc-security-group-ids <security_group_ids> \
+            --db-subnet-group-name <subnet_group_name>
+
+  - name: Deploy Kubernetes Components
+    steps:
+      - name: Install Helm
+        image: alpine/helm:3.6.3
+        commands:
+          - helm repo add stable https://charts.helm.sh/stable
+          - helm repo update
+
+      - name: Install nginx-ingress with Helm
+        image: alpine/helm:3.6.3
+        commands:
+          - helm install nginx-ingress stable/nginx-ingress
+
+      - name: Deploy Supabase with Helm
+        image: alpine/helm:3.6.3
+        commands:
+          - helm install supabase supabase/supabase \
+            --set postgrest.enabled=true \
+            --set postgrest.auroraEndpoint=<aurora_endpoint> \
+            --set storage.enabled=true \
+            --set storage.s3Endpoint=<s3_endpoint> \
+            --set auth.enabled=true \
+            --set realtime.enabled=true \
+            --set kong.enabled=true \
+            --set kong.ingress.enabled=true \
+            --set kong.ingress.hosts[0].host=<ingress_host> \
+            --set kong.ingress.hosts[0].paths[0].path=/

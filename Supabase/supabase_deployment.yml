@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: supabase
+  template:
+    metadata:
+      labels:
+        app: supabase
+    spec:
+      containers:
+        - name: postgrest
+          image: supabase/postgrest:v0.5.2
+          env:
+            - name: POSTGREST_DB_URI
+              value: <aurora_db_uri>
+            - name: POSTGREST_DB_SCHEMA
+              value: public
+            - name: POSTGREST_ANONYMOUS_ROLE
+              value: "authenticated"
+          ports:
+            - containerPort: 3000
+        - name: gotrue
+          image: supabase/gotrue:v1.10.0
+          env:
+            - name: GOTRUE_DB_URI
+              value: <aurora_db_uri>
+          ports:
+            - containerPort: 9999
+        - name: storage
+          image: supabase/storage-api:v0.8.1
+          env:
+            - name: B2_BUCKET
+              value: <s3_bucket_name>
+            - name: B2_KEY
+              value: <s3_access_key>
+            - name: B2_SECRET
+              value: <s3_secret_key>
+          ports:
+            - containerPort: 9000
+        - name: kong
+          image: supabase/kong:v2.5.1
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+          ports:
+            - containerPort: 8000
+            - containerPort: 8443
